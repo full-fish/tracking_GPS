@@ -12,15 +12,30 @@ INTERVAL = 60  # 수집 간격 (초) - 배터리를 위해 60초 이상 권장
 
 
 def get_location():
+    # 1단계: 배터리 절약을 위해 'network' (와이파이/기지국) 먼저 시도
     try:
-        # 배터리 절약을 위해 'network' 우선, 실패 시 'gps' 시도
-        # 이동 경로용이므로 gps가 좋지만 실내에선 network가 잡힐 확률 높음
-        cmd = ["termux-location", "-p", "gps", "-r", "last"]
+        # -p network: 배터리를 적게 씀, 실내에서도 잘 잡힘
+        cmd = ["termux-location", "-p", "network"]
+        # 5초 안에 잡히면 성공 (네트워크는 보통 빠름)
         result = subprocess.run(
-            cmd, capture_output=True, text=True, check=True, timeout=10
+            cmd, capture_output=True, text=True, check=True, timeout=5
         )
         return result.stdout
     except:
+        # 실패하면 조용히 다음 단계로 넘어감
+        pass
+
+    # 2단계: 네트워크 실패 시 'gps' (위성) 시도
+    try:
+        # -p gps: 배터리 많이 씀, 야외에서 정확함
+        cmd = ["termux-location", "-p", "gps"]
+        # GPS는 신호 잡는 데 오래 걸리므로 15초 대기
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=True, timeout=15
+        )
+        return result.stdout
+    except:
+        # 둘 다 실패하면 None 반환
         return None
 
 
