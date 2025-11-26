@@ -156,8 +156,8 @@ def send_email_with_files(files, start_t, end_t):
 def send_data(arg1, arg2=None):
     """
     데이터 전송 함수
-    - arg1: 'all' 또는 시작 시간
-    - arg2: 종료 시간 (arg1이 'all'일 경우 무시됨)
+    - arg1: 'all' 또는 시작 시간 (YYYY-MM-DD_HH:MM)
+    - arg2: 종료 시간 (YYYY-MM-DD_HH:MM)
     """
     is_all_data = False
     start_dt = None
@@ -170,22 +170,24 @@ def send_data(arg1, arg2=None):
         end_str = "(ALL)"
         print("🔍 전체 기간의 데이터를 조회합니다.")
     else:
-        # 날짜 파싱 모드
-        start_str = arg1
-        end_str = arg2
-        try:
-            if len(start_str) == 10:
-                start_str += " 00:00"
-            if len(end_str) == 10:
-                end_str += " 23:59"
+        # [수정된 부분]: 언더바를 공백으로 치환하여 datetime 파싱 준비
+        raw_start_str = arg1
+        raw_end_str = arg2
 
+        start_str = raw_start_str.replace("_", " ")
+        end_str = raw_end_str.replace("_", " ")
+
+        try:
+            # YYYY-MM-DD HH:MM 형식으로 파싱
             fmt = "%Y-%m-%d %H:%M"
             start_dt = datetime.strptime(start_str, fmt)
             end_dt = datetime.strptime(end_str, fmt)
         except ValueError:
-            print("❌ 날짜 형식 오류. 'YYYY-MM-DD HH:MM' 형태로 입력하세요.")
+            print("❌ 날짜 형식 오류. 'YYYY-MM-DD_HH:MM' 형태로 입력하세요.")
+            print(f"   입력된 값: 시작='{raw_start_str}', 종료='{raw_end_str}'")
             return
 
+    # 2. CSV 읽기 (이하 동일)
     if not os.path.exists(LOG_FILE):
         print(f"❌ 로그 파일({LOG_FILE})이 없습니다.")
         return
@@ -199,7 +201,6 @@ def send_data(arg1, arg2=None):
             if not row or len(row) < 3:
                 continue
 
-            # 'all' 모드면 무조건 추가, 아니면 날짜 비교
             if is_all_data:
                 filtered_rows.append(row)
             else:
@@ -216,7 +217,6 @@ def send_data(arg1, arg2=None):
         print("❌ 전송할 데이터가 없습니다.")
         return
 
-    # 파일명 생성 (오늘 날짜 기준)
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
     export_csv = os.path.join(BASE_DIR, f"path_{timestamp_str}.csv")
     export_kml = os.path.join(BASE_DIR, f"map_{timestamp_str}.kml")
@@ -231,13 +231,12 @@ def send_data(arg1, arg2=None):
     send_email_with_files([export_csv, export_kml], start_str, end_str)
 
 
+# =========================
+# 🚀 메인 실행부 (main_logic)
+# =========================
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("사용법:")
-        print("  python gps_manager.py start")
-        print("  python gps_manager.py stop")
-        print("  python gps_manager.py send '시작시간' '종료시간'")
-        print("  python gps_manager.py send all  (전체 데이터 전송)")
+        print("사용법: python gps_manager.py [start|stop|send '시작' '종료']")
         sys.exit(1)
 
     mode = sys.argv[1]
@@ -251,8 +250,11 @@ if __name__ == "__main__":
         if len(sys.argv) == 3 and sys.argv[2].lower() == "all":
             send_data("all")
         elif len(sys.argv) >= 4:
+            # 2개의 인수를 send_data 함수에 전달
             send_data(sys.argv[2], sys.argv[3])
         else:
-            print("❌ 사용법 오류: 'send all' 또는 'send 시작 종료' 형태로 입력하세요.")
+            print(
+                "❌ 사용법 오류: 'send all' 또는 'send 시작일자_시간 종료일자_시간' 형태로 입력하세요."
+            )
     else:
         print(f"❌ 알 수 없는 명령어: {mode}")
