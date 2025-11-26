@@ -11,7 +11,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 
 # =========================
-# ⚙️ 절대 경로 설정 (Tasker 오류 방지)
+# ⚙️ 절대 경로 설정
 # =========================
 BASE_DIR = "/data/data/com.termux/files/home/dev/tracking_GPS"
 LOGGER_SCRIPT = os.path.join(BASE_DIR, "gps_logger.py")
@@ -24,14 +24,10 @@ CONFIG_FILE = os.path.join(BASE_DIR, "config.ini")
 
 
 def start_logging():
-    # 이미 실행 중인지 확인
     try:
-        # pgrep에서 스크립트 이름만으로 검색
         pid = subprocess.check_output(["pgrep", "-f", "gps_logger.py"]).strip()
         print(f"⚠️ 이미 실행 중입니다! (PID: {pid.decode()})")
     except subprocess.CalledProcessError:
-        # 백그라운드 실행 (절대 경로 사용)
-        # 로그가 꼬이지 않도록 /dev/null로 보내거나 별도 로그 파일 지정 가능
         cmd = f"nohup python {LOGGER_SCRIPT} > /dev/null 2>&1 &"
         os.system(cmd)
         print(f"✅ GPS 수집을 시작했습니다. (백그라운드)")
@@ -75,8 +71,6 @@ def create_kml(data_rows, output_file):
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(kml_header)
         for row in data_rows:
-            # CSV: time, lat, lon, acc, prov
-            # KML: lon, lat, alt
             if len(row) >= 3:
                 f.write(f"{row[2]},{row[1]},0 \n")
         f.write(kml_footer)
@@ -151,7 +145,6 @@ def send_email_with_files(files, start_t, end_t):
             print(f"  ❌ [{section}] 전송 실패: {e}")
             continue
 
-    # 전송 후 임시 파일 삭제
     for f in files:
         if os.path.exists(f):
             os.remove(f)
@@ -160,19 +153,38 @@ def send_email_with_files(files, start_t, end_t):
         print("\n❌ 모든 계정 전송 실패.")
 
 
-def send_data(start_str, end_str):
-    try:
-        if len(start_str) == 10:
-            start_str += " 00:00"
-        if len(end_str) == 10:
-            end_str += " 23:59"
+def send_data(arg1, arg2=None):
+    """
+    데이터 전송 함수
+    - arg1: 'all' 또는 시작 시간
+    - arg2: 종료 시간 (arg1이 'all'일 경우 무시됨)
+    """
+    is_all_data = False
+    start_dt = None
+    end_dt = None
 
-        fmt = "%Y-%m-%d %H:%M"
-        start_dt = datetime.strptime(start_str, fmt)
-        end_dt = datetime.strptime(end_str, fmt)
-    except ValueError:
-        print("❌ 날짜 형식 오류. '2025-11-26 09:00' 형태로 입력하세요.")
-        return
+    # 'all' 모드 확인
+    if arg1.lower() == "all":
+        is_all_data = True
+        start_str = "전체 기간"
+        end_str = "(ALL)"
+        print("🔍 전체 기간의 데이터를 조회합니다.")
+    else:
+        # 날짜 파싱 모드
+        start_str = arg1
+        end_str = arg2
+        try:
+            if len(start_str) == 10:
+                start_str += " 00:00"
+            if len(end_str) == 10:
+                end_str += " 23:59"
+
+            fmt = "%Y-%m-%d %H:%M"
+            start_dt = datetime.strptime(start_str, fmt)
+            end_dt = datetime.strptime(end_str, fmt)
+        except ValueError:
+            print("❌ 날짜 형식 오류. 'YYYY-MM-DD HH:MM' 형태로 입력하세요.")
+            return
 
     if not os.path.exists(LOG_FILE):
         print(f"❌ 로그 파일({LOG_FILE})이 없습니다.")
@@ -182,25 +194,32 @@ def send_data(start_str, end_str):
     with open(LOG_FILE, "r", encoding="utf-8") as f:
         reader = csv.reader(f)
         header = next(reader, None)
+
         for row in reader:
             if not row or len(row) < 3:
                 continue
-            try:
-                row_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                if start_dt <= row_dt <= end_dt:
-                    filtered_rows.append(row)
-            except ValueError:
-                continue
 
-    print(f"🔍 {len(filtered_rows)}개의 데이터 발견.")
+            # 'all' 모드면 무조건 추가, 아니면 날짜 비교
+            if is_all_data:
+                filtered_rows.append(row)
+            else:
+                try:
+                    row_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                    if start_dt <= row_dt <= end_dt:
+                        filtered_rows.append(row)
+                except ValueError:
+                    continue
+
+    print(f"🔍 총 {len(filtered_rows)}개의 데이터 발견.")
 
     if not filtered_rows:
         print("❌ 전송할 데이터가 없습니다.")
         return
 
-    # 임시 파일 생성 (절대 경로 사용)
-    export_csv = os.path.join(BASE_DIR, f"path_{start_dt.strftime('%Y%m%d')}.csv")
-    export_kml = os.path.join(BASE_DIR, f"map_{start_dt.strftime('%Y%m%d')}.kml")
+    # 파일명 생성 (오늘 날짜 기준)
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
+    export_csv = os.path.join(BASE_DIR, f"path_{timestamp_str}.csv")
+    export_kml = os.path.join(BASE_DIR, f"map_{timestamp_str}.kml")
 
     with open(export_csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
@@ -214,18 +233,26 @@ def send_data(start_str, end_str):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("사용법: python gps_manager.py [start|stop|send '시작' '종료']")
+        print("사용법:")
+        print("  python gps_manager.py start")
+        print("  python gps_manager.py stop")
+        print("  python gps_manager.py send '시작시간' '종료시간'")
+        print("  python gps_manager.py send all  (전체 데이터 전송)")
         sys.exit(1)
 
     mode = sys.argv[1]
+
     if mode == "start":
         start_logging()
     elif mode == "stop":
         stop_logging()
     elif mode == "send":
-        if len(sys.argv) < 4:
-            print("❌ 시간을 입력해주세요.")
-        else:
+        # 인자 개수에 따라 분기
+        if len(sys.argv) == 3 and sys.argv[2].lower() == "all":
+            send_data("all")
+        elif len(sys.argv) >= 4:
             send_data(sys.argv[2], sys.argv[3])
+        else:
+            print("❌ 사용법 오류: 'send all' 또는 'send 시작 종료' 형태로 입력하세요.")
     else:
         print(f"❌ 알 수 없는 명령어: {mode}")

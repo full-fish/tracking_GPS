@@ -13,7 +13,7 @@ BASE_DIR = "/data/data/com.termux/files/home/dev/tracking_GPS"
 LOG_FILE = os.path.join(BASE_DIR, "gps_log.csv")
 
 # 시간 설정 (초 단위)
-GPS_TIMEOUT = 15  # GPS 탐색 제한 시간
+GPS_TIMEOUT = 20  # GPS 탐색 제한 시간
 LONG_NET_TIMEOUT = 120  # GPS 실패 직후 넉넉한 네트워크 탐색 시간 (2분)
 SHORT_NET_TIMEOUT = 20  # 평상시 네트워크 탐색 시간
 GPS_RETRY_INTERVAL = 1800  # 네트워크 모드일 때 GPS 재시도 간격 (30분)
@@ -54,7 +54,7 @@ def save_to_csv(json_str):
 
 
 def try_gps():
-    log("🛰️ GPS 탐색 (최대 15초)...")
+    log("🛰️ GPS 탐색 (최대 20초)...")
     proc = subprocess.Popen(
         ["termux-location", "-p", "gps"],
         stdout=subprocess.PIPE,
