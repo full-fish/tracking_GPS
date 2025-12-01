@@ -11,7 +11,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 
 # =========================
-# ⚙️ 절대 경로 설정
+# 절대 경로 설정
 # =========================
 BASE_DIR = "/data/data/com.termux/files/home/dev/tracking_GPS"
 LOGGER_SCRIPT = os.path.join(BASE_DIR, "gps_logger.py")
@@ -19,19 +19,19 @@ LOG_FILE = os.path.join(BASE_DIR, "gps_log.csv")
 CONFIG_FILE = os.path.join(BASE_DIR, "config.ini")
 
 # =========================
-# 🛠️ 기능 함수들
+# 기능 함수들
 # =========================
 
 
 def start_logging():
     try:
         pid = subprocess.check_output(["pgrep", "-f", "gps_logger.py"]).strip()
-        print(f"⚠️ 이미 실행 중입니다! (PID: {pid.decode()})")
+        print(f"이미 실행 중입니다! (PID: {pid.decode()})")
     except subprocess.CalledProcessError:
         cmd = f"nohup python {LOGGER_SCRIPT} > /dev/null 2>&1 &"
         os.system(cmd)
-        print(f"✅ GPS 수집을 시작했습니다. (백그라운드)")
-        print(f"📂 저장 위치: {LOG_FILE}")
+        print(f"GPS 수집을 시작했습니다. (백그라운드)")
+        print(f"저장 위치: {LOG_FILE}")
 
 
 def stop_logging():
@@ -39,9 +39,9 @@ def stop_logging():
         pid = subprocess.check_output(["pgrep", "-f", "gps_logger.py"]).strip()
         os.system(f"kill {pid.decode()}")
         subprocess.run(["termux-wake-unlock"])
-        print("🛑 GPS 수집을 종료했습니다.")
+        print("GPS 수집을 종료했습니다.")
     except subprocess.CalledProcessError:
-        print("⚠️ 실행 중인 GPS 수집기가 없습니다.")
+        print("실행 중인 GPS 수집기가 없습니다.")
 
 
 def create_kml(data_rows, output_file):
@@ -82,17 +82,17 @@ def send_email_with_files(files, start_t, end_t):
     if os.path.exists(CONFIG_FILE):
         config.read(CONFIG_FILE)
     else:
-        print(f"❌ config.ini 파일을 찾을 수 없습니다.\n({CONFIG_FILE})")
+        print(f"config.ini 파일을 찾을 수 없습니다.\n({CONFIG_FILE})")
         return
 
     if not config.sections():
-        print("❌ 설정 파일에 계정 정보가 없습니다.")
+        print("설정 파일에 계정 정보가 없습니다.")
         return
 
     email_sent_flag = False
 
     for section in config.sections():
-        print(f"\n📨 [{section}] 계정으로 전송 시도 중...")
+        print(f"\n[{section}] 계정으로 전송 시도 중...")
         try:
             settings = config[section]
             SMTP_SERVER = settings.get("smtp_server")
@@ -104,13 +104,13 @@ def send_email_with_files(files, start_t, end_t):
             if not all(
                 [SMTP_SERVER, SMTP_PORT, SENDER_EMAIL, APP_PASSWORD, RECIPIENT_EMAIL]
             ):
-                print(f"  ⚠️ [{section}] 정보 부족. 패스.")
+                print(f"[{section}] 정보 부족. 패스.")
                 continue
 
             msg = MIMEMultipart()
             msg["From"] = SENDER_EMAIL
             msg["To"] = RECIPIENT_EMAIL
-            msg["Subject"] = f"🗺️ 이동 동선 데이터 ({start_t} ~ {end_t})"
+            msg["Subject"] = f"이동 동선 데이터 ({start_t} ~ {end_t})"
 
             body = (
                 f"요청하신 기간의 이동 경로 데이터입니다.\n"
@@ -137,12 +137,12 @@ def send_email_with_files(files, start_t, end_t):
             server.sendmail(SENDER_EMAIL, RECIPIENT_EMAIL, msg.as_string())
             server.quit()
 
-            print(f"  ✅ [{section}] 메일 전송 성공!")
+            print(f"[{section}] 메일 전송 성공!")
             email_sent_flag = True
             break
 
         except Exception as e:
-            print(f"  ❌ [{section}] 전송 실패: {e}")
+            print(f"[{section}] 전송 실패: {e}")
             continue
 
     for f in files:
@@ -150,7 +150,7 @@ def send_email_with_files(files, start_t, end_t):
             os.remove(f)
 
     if not email_sent_flag:
-        print("\n❌ 모든 계정 전송 실패.")
+        print("\n모든 계정 전송 실패.")
 
 
 def send_data(arg1, arg2=None):
@@ -168,7 +168,7 @@ def send_data(arg1, arg2=None):
         is_all_data = True
         start_str = "전체 기간"
         end_str = "(ALL)"
-        print("🔍 전체 기간의 데이터를 조회합니다.")
+        print("전체 기간의 데이터를 조회합니다.")
     else:
         # [수정된 부분]: 언더바를 공백으로 치환하여 datetime 파싱 준비
         raw_start_str = arg1
@@ -183,13 +183,13 @@ def send_data(arg1, arg2=None):
             start_dt = datetime.strptime(start_str, fmt)
             end_dt = datetime.strptime(end_str, fmt)
         except ValueError:
-            print("❌ 날짜 형식 오류. 'YYYY-MM-DD_HH:MM' 형태로 입력하세요.")
-            print(f"   입력된 값: 시작='{raw_start_str}', 종료='{raw_end_str}'")
+            print("날짜 형식 오류. 'YYYY-MM-DD_HH:MM' 형태로 입력하세요.")
+            print(f"입력된 값: 시작='{raw_start_str}', 종료='{raw_end_str}'")
             return
 
     # 2. CSV 읽기 (이하 동일)
     if not os.path.exists(LOG_FILE):
-        print(f"❌ 로그 파일({LOG_FILE})이 없습니다.")
+        print(f"로그 파일({LOG_FILE})이 없습니다.")
         return
 
     filtered_rows = []
@@ -211,10 +211,10 @@ def send_data(arg1, arg2=None):
                 except ValueError:
                     continue
 
-    print(f"🔍 총 {len(filtered_rows)}개의 데이터 발견.")
+    print(f"총 {len(filtered_rows)}개의 데이터 발견.")
 
     if not filtered_rows:
-        print("❌ 전송할 데이터가 없습니다.")
+        print("전송할 데이터가 없습니다.")
         return
 
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
@@ -232,7 +232,7 @@ def send_data(arg1, arg2=None):
 
 
 # =========================
-# 🚀 메인 실행부 (main_logic)
+# 메인 실행부 (main_logic)
 # =========================
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -254,7 +254,7 @@ if __name__ == "__main__":
             send_data(sys.argv[2], sys.argv[3])
         else:
             print(
-                "❌ 사용법 오류: 'send all' 또는 'send 시작일자_시간 종료일자_시간' 형태로 입력하세요."
+                "사용법 오류: 'send all' 또는 'send 시작일자_시간 종료일자_시간' 형태로 입력하세요."
             )
     else:
-        print(f"❌ 알 수 없는 명령어: {mode}")
+        print(f"알 수 없는 명령어: {mode}")

@@ -6,7 +6,7 @@ import csv
 from datetime import datetime
 
 # =========================
-# ⚙️ 설정 (알고리즘 파라미터)
+# 설정 (알고리즘 파라미터)
 # =========================
 # Tasker 오류 방지를 위한 절대 경로
 BASE_DIR = "/data/data/com.termux/files/home/dev/tracking_GPS"
@@ -46,15 +46,15 @@ def save_to_csv(json_str):
             writer = csv.writer(f)
             writer.writerow([timestamp, lat, lon, acc, prov])
 
-        log(f"💾 기록됨: {lat}, {lon} ({prov})")
+        log(f"기록됨: {lat}, {lon} ({prov})")
         return True
     except Exception as e:
-        log(f"❌ 저장 실패: {e}")
+        log(f"저장 실패: {e}")
         return False
 
 
 def try_gps():
-    log("🛰️ GPS 탐색 (최대 20초)...")
+    log("GPS 탐색 (최대 20초)...")
     proc = subprocess.Popen(
         ["termux-location", "-p", "gps"],
         stdout=subprocess.PIPE,
@@ -64,12 +64,12 @@ def try_gps():
     try:
         stdout, stderr = proc.communicate(timeout=GPS_TIMEOUT)
         if proc.returncode == 0:
-            log("✅ GPS 성공!")
+            log("GPS 성공!")
             save_to_csv(stdout)
             return True
         return False
     except subprocess.TimeoutExpired:
-        log("⚠️ GPS 시간 초과. Kill.")
+        log("GPS 시간 초과. Kill.")
         proc.kill()
         proc.wait()
         return False
@@ -82,7 +82,7 @@ def try_gps():
 
 
 def try_network(duration):
-    log(f"📡 네트워크 탐색 ({duration}초)...")
+    log(f"네트워크 탐색 ({duration}초)...")
     try:
         result = subprocess.run(
             ["termux-location", "-p", "network"],
@@ -91,12 +91,12 @@ def try_network(duration):
             timeout=duration,
         )
         if result.returncode == 0:
-            log("✅ 네트워크 성공!")
+            log("네트워크 성공!")
             save_to_csv(result.stdout)
             return True
         return False
     except subprocess.TimeoutExpired:
-        log(f"⚠️ 네트워크 시간 초과.")
+        log(f"네트워크 시간 초과.")
         return False
 
 
@@ -104,35 +104,35 @@ def main_logic():
     current_mode = "GPS_MODE"
     last_gps_try_time = time.time()
 
-    log(f"🚀 스마트 위치 추적 시작")
+    log(f"스마트 위치 추적 시작")
     subprocess.run(["termux-wake-lock"])  # 백그라운드 유지
 
     try:
         while True:
             if current_mode == "GPS_MODE":
                 if try_gps():
-                    log(f"   -> GPS 모드 유지. {LOOP_INTERVAL}초 대기.")
+                    log(f"-> GPS 모드 유지. {LOOP_INTERVAL}초 대기.")
                 else:
-                    log("🔄 GPS 실패. 2분간 네트워크 탐색 (Cooling down)...")
+                    log("GPS 실패. 2분간 네트워크 탐색 (Cooling down)...")
                     try_network(LONG_NET_TIMEOUT)
                     current_mode = "NETWORK_MODE"
                     last_gps_try_time = time.time()
-                    log(f"   -> 네트워크 모드 전환. (GPS 재시도: 30분 뒤)")
+                    log(f"-> 네트워크 모드 전환. (GPS 재시도: 30분 뒤)")
 
             elif current_mode == "NETWORK_MODE":
                 time_since_last_gps = time.time() - last_gps_try_time
                 if time_since_last_gps >= GPS_RETRY_INTERVAL:
-                    log("⏰ 30분 경과. GPS 재확인...")
+                    log("30분 경과. GPS 재확인...")
                     if try_gps():
                         current_mode = "GPS_MODE"
-                        log("🎉 GPS 복구됨! GPS 모드로 복귀.")
+                        log("GPS 복구됨! GPS 모드로 복귀.")
                     else:
-                        log("😓 GPS 실패. 다시 2분간 네트워크 탐색.")
+                        log("GPS 실패. 다시 2분간 네트워크 탐색.")
                         try_network(LONG_NET_TIMEOUT)
                         last_gps_try_time = time.time()
                 else:
                     try_network(SHORT_NET_TIMEOUT)
-                    log(f"   -> 네트워크 모드 유지.")
+                    log(f"-> 네트워크 모드 유지.")
 
             time.sleep(LOOP_INTERVAL)
 
@@ -140,7 +140,7 @@ def main_logic():
         log("중지됨.")
     finally:
         subprocess.run(["termux-wake-unlock"])
-        log("🛑 종료 (Wake Lock 해제)")
+        log("종료 (Wake Lock 해제)")
 
 
 if __name__ == "__main__":
